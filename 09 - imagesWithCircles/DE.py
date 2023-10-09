@@ -11,15 +11,17 @@ class DiferentialEvolution:
         report_interval:int = None,
         eps:float           = 0.01,
         n_rep:int           = None,
-        verbose:bool        = False
+        verbose:bool        = False,
+        print_elite:bool    = False
     ):
-        self.verbose   = verbose
-        self.func      = func
-        self.bounds    = np.array(bounds)
-        self.args      = args
-        self.popsize   = popsize
-        self.mutation  = mutation
-        self.crossover = crossover
+        self.verbose     = verbose
+        self.print_elite = print_elite
+        self.func        = func
+        self.bounds      = np.array(bounds)
+        self.args        = args
+        self.popsize     = popsize
+        self.mutation    = mutation
+        self.crossover   = crossover
 
         self.population = None
         self.fitness    = None
@@ -39,7 +41,10 @@ class DiferentialEvolution:
     def __init_population(self):
         self.population = np.zeros((self.popsize,self.nvar))
         for i in range(self.nvar):
-            self.population[:,i] = np.random.uniform(self.bounds[i,0],self.bounds[i,1],(self.popsize))
+            self.population[:,i] = np.random.uniform(
+                self.bounds[i,0],self.bounds[i,1],
+                (self.popsize)
+            )
     
     def __fitness_population(self):
         self.fitness = np.zeros((self.popsize))
@@ -65,6 +70,16 @@ class DiferentialEvolution:
     def __get_elite(self):
         i = np.argmin(self.fitness)
         return self.population[i], self.fitness[i], i
+    
+    def __print_progress(self, k, n_rep):
+        elite, elite_fit, elite_idx = self.__get_elite()
+
+        print(f'{(k/self.maxit)*100: 0.2f}%', end=' ')
+        print(f'elite_idx: {elite_idx} n_rep {n_rep}/{self.n_rep}', end=' ')
+        print(f'elite fitness: {elite_fit: 0.4f}', end=' ')
+        if self.print_elite:
+            print(f'elite: {elite}', end=' ')
+        print('', end='\r')
         
     def optimize(self):
         self.__init_population()
@@ -72,8 +87,9 @@ class DiferentialEvolution:
         k = 0
 
         vi  = np.zeros((self.nvar))
-        rep = np.zeros((self.n_rep))
-        elite_idx = 0
+        # rep = np.zeros((self.n_rep))
+        n_rep = 0
+        old_elite_i = elite_i = self.__get_elite()[2]
         success = False
         
         while k < self.maxit:
@@ -87,17 +103,24 @@ class DiferentialEvolution:
                     self.fitness[i] = ui_fitness
                     self.population[i] = vi
             
-            rep[k%self.n_rep] = elite_idx = self.__get_elite()[2]
+            elite_i = self.__get_elite()[2]
+            if(elite_i == old_elite_i):
+                n_rep += 1
+            else:
+                n_rep = 0
+            old_elite_i = elite_i
+
+            if(n_rep == self.n_rep):
+                success = True
+                break
 
             if k % self.report_interval == 0:
-                n_rep = np.count_nonzero(rep == elite_idx)
-                if n_rep == self.n_rep:
-                    success = True
-                    break
                 if self.verbose:
-                    elite, elite_fit, elite_idx = self.__get_elite()
-                    print(f'{k} elite_idx: {elite_idx} n_rep {n_rep} elite fitness: {elite_fit} elite: {elite}')
+                    self.__print_progress(k, n_rep)
             k += 1
+        if self.verbose:
+            self.__print_progress(k, n_rep)
+            print()
 
         elite, elite_fit, elite_idx = self.__get_elite()
         return {'success':success,'sol':elite, 'fitness':elite_fit, 'niter':k}
