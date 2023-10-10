@@ -17,7 +17,7 @@ class DiferentialEvolution:
         self.verbose     = verbose
         self.print_elite = print_elite
         self.func        = func
-        self.bounds      = np.array(bounds)
+        self.bounds      = bounds
         self.args        = args
         self.popsize     = popsize
         self.mutation    = mutation
@@ -57,7 +57,10 @@ class DiferentialEvolution:
     def __mutation(self):
         r1,r2,r3 = np.random.randint(0, self.popsize, 3)
         f = np.random.uniform(self.mutation[0],self.mutation[1])
-        return self.population[r1] + f*(self.population[r2]-self.population[r3])
+        return np.clip(
+            self.population[r1] + f*(self.population[r2]-self.population[r3]),
+            self.bounds[:, 0], self.bounds[:, 1]
+        )
     
     def __crossover(self, xi, vi):
         rnd = np.random.randint(0, self.nvar)
