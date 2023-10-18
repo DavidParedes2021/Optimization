@@ -77,7 +77,7 @@ class ParticleSwarmOptimization:
 		elite_idx = np.argmin(self.Fit)
 
 		if copy:
-			return elite_idx, np.array(deepcopy(self.X[elite_idx]))
+			return elite_idx, np.array(deepcopy(self.P_best[elite_idx]))
 		return elite_idx
 	# end __get_elite
 
@@ -199,12 +199,12 @@ class MultiObjectiveParticleSwarmOptimization:
 		if self.Fit is None:
 			self.Fit = np.zeros((self.p_size, self.n_tar))
 		for i in range(self.p_size):
-			self.Fit[i] = self.__fitness(self.X[i])
+			self.Fit[i] = self.__fitness(self.P_best[i])
 		self.Lev = nsga.NSGA2(self.Fit)
 	# end __calc_fitness
 	def __get_elite(self):
 		leaders = self.Lev == 0
-		return deepcopy(self.X[leaders])
+		return deepcopy(self.P_best[leaders])
 	# end __get_elite
 
 	def __update_velocity(self, index:int, w:float, laz:float, env:float):
@@ -216,7 +216,7 @@ class MultiObjectiveParticleSwarmOptimization:
 		self.V[index] = delta_v + nostalgia + envy
 	# end __update_velocity
 
-	def optimize(self): #TODO: put the multi-objective changes in the algorithm
+	def optimize(self):
 		w   = copy(self.w)
 		laz = copy(self.laz)
 		env = copy(self.env)
@@ -241,6 +241,7 @@ class MultiObjectiveParticleSwarmOptimization:
 					self.P_best[i] = np.copy(self.X[i])
 			#end for i
 			## TODO: update elite
+			self.__calc_fitness()
 			self.elite = self.__get_elite()
 			w   -= self.w_delta
 			laz -= self.laz_delta
