@@ -12,6 +12,7 @@ class ParticleSwarmOptimization:
 		function_args  = (),
 		pop_size:int   = 50,
 		max_it:int     = 1000,
+		max_rep:int    = None,
 		inertia:float  = 0.9,
 		lazyness:float = 0.9,
 		enviness:float = 0.9,
@@ -25,9 +26,12 @@ class ParticleSwarmOptimization:
 		self.bounds = bounds
 		self.n_var  = bounds.shape[0]
 
-		self.p_size = pop_size
-		self.max_it = max_it
-		self.k      = 0
+		self.p_size  = pop_size
+		self.max_it  = max_it
+		self.max_rep = max_rep
+		if self.max_rep is None:
+			self.max_rep = int(self.max_rep*0.10)
+		self.k       = 0
 
 		self.min_v  = min_vel
 		self.max_v  = max_vel
@@ -99,6 +103,9 @@ class ParticleSwarmOptimization:
 		elite_idx, self.elite = self.__get_elite()
 		elite_fit = self.Fit[elite_idx]
 
+		old_idx = elite_idx
+		n_rep   = 0
+
 		for self.k in range(1, self.max_it+1):
 			for i in range(self.p_size):
 				self.__update_velocity(i, w, laz, env)
@@ -122,6 +129,14 @@ class ParticleSwarmOptimization:
 			w   -= self.w_delta
 			laz -= self.laz_delta
 			env -= self.env_delta
+			
+			if old_idx == elite_idx:
+				n_rep += 1
+			else:
+				n_rep = 0
+			old_idx = elite_idx
+			if n_rep >= self.max_rep:
+				break
 		# end for k in max_it
 
 		return deepcopy(self.elite)
@@ -135,6 +150,7 @@ class MultiObjectiveParticleSwarmOptimization:
 		function_args:list,
 		pop_size:int   = 50,
 		max_it:int     = 1000,
+		elite_prop     = 0.75,
 		inertia:float  = 0.9,
 		lazyness:float = 0.9,
 		enviness:float = 0.9,
@@ -149,9 +165,10 @@ class MultiObjectiveParticleSwarmOptimization:
 		self.n_tar  = len(fitness_func)
 		self.n_var  = bounds.shape[0]
 
-		self.p_size = pop_size
-		self.max_it = max_it
-		self.k      = 0
+		self.p_size  = pop_size
+		self.max_it  = max_it
+		self.elite_p = elite_prop
+		self.k       = 0
 
 		self.min_v  = min_vel
 		self.max_v  = max_vel
@@ -246,6 +263,9 @@ class MultiObjectiveParticleSwarmOptimization:
 			w   -= self.w_delta
 			laz -= self.laz_delta
 			env -= self.env_delta
+
+			if len(self.elite)/self.p_size > self.elite_p:
+				break
 		# end for k in max_it
 
 		return deepcopy(self.elite)
