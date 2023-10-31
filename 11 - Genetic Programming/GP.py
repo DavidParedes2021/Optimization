@@ -38,4 +38,4 @@ class Function_N(GP_Node):
 
 		return self.func(resLeft, resRight)
 	def __str__(self) -> str:
-		return f'{str(self.leftChild)} {str(self.rightChild)} {str(self.label)}'
+		return f'{str(self.leftChild)},{str(self.rightChild)}{str(self.label)}'
