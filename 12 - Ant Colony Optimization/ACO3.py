@@ -69,7 +69,9 @@ class AntColonyOptimization:
                     self.best_ant_length = ant_path_len[i]
 
                 self.__update_pheromones(ant_path[i], ant_path_len[i])
-                
+
+            self.pher_mxt *= (1.0 - self.evapr)
+
             if k%10 and self.verbose == True:
                 print("it: ",k)
                 self.plot_function(self)
