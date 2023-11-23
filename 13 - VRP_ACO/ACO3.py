@@ -1,7 +1,7 @@
-import numpy as np
+import numpy             as np
+import matplotlib.pyplot as plt
 
 class AntColonyOptimization:
-
     def __default_h_calc(self, dist_mtx: np.ndarray) -> np.ndarray:
         heuristic_mtx = np.ones_like(dist_mtx, dtype=np.float64)
         nonzero_indices = dist_mtx > 0.0
@@ -103,6 +103,55 @@ class AntColonyOptimization:
             self.pher_mxt[int(path[i])][int(path[i + 1])] += 1.0 / length
             self.pher_mxt[int(path[i + 1])][int(path[i])] += 1.0 / length
 
+class ACOPlotter:
+    def __init__(self, points) -> None:
+        self.points = points
+    # end __init__
+    def path_plot(self, aco_instance:AntColonyOptimization):
+        plt.figure(figsize=(12, 6))
+
+        # Plot 1: Pheromone levels on edges
+        plt.subplot(1, 2, 1)
+        plt.scatter(self.points[:, 0], self.points[:, 1], c='red', marker='o', label='Points')
+        
+        max_pheromone_level = np.max(aco_instance.pher_mxt)  # Get the maximum pheromone level for normalization
+        
+        for i in range(aco_instance.pher_mxt.shape[0]):
+            for j in range(i+1, aco_instance.pher_mxt.shape[1]):
+                pheromone_level = aco_instance.pher_mxt[i, j]
+                normalized_alpha = pheromone_level / max_pheromone_level  # Normalize alpha to [0, 1]
+                plt.plot(
+                    [self.points[i, 0], self.points[j, 0]],
+                    [self.points[i, 1], self.points[j, 1]],
+                    color='gray', alpha=normalized_alpha, linewidth=2
+                )
+        
+        plt.title('Pheromone Levels on Edges')
+        plt.legend()
+
+        # Plot 2: Best path
+        plt.subplot(1, 2, 2)
+        
+        # Visualize the original points
+        plt.scatter(
+            self.points[:, 0], self.points[:, 1],
+            c='blue', marker='o', label='Original Points'
+        )
+        # Visualize the best path found by the Ant Colony Optimization
+        best_path = np.append(aco_instance.best_ant, aco_instance.best_ant[0])  # Closing the loop
+        best_path = best_path.astype(int)  # Convert to integers
+        plt.plot(self.points[best_path, 0], self.points[best_path, 1], c='red', linestyle='-', linewidth=2, label='Best Path')
+        
+        # Annotate each point with its index
+        for i, point in enumerate(self.points):
+            plt.text(point[0], point[1], str(i), fontsize=8, ha='right', va='bottom')
+        plt.title('Ant Colony Optimization - Best Path')
+        plt.xlabel('X Coordinate')
+        plt.ylabel('Y Coordinate')
+        plt.legend()
+
+        plt.tight_layout()
+        plt.show()
 
 class NTargetsACO(AntColonyOptimization):
     def __init__(self,
