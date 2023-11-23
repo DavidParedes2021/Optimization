@@ -160,6 +160,7 @@ class NTargetsACO(AntColonyOptimization):
         n_paths:  int,
         plot_function,
         max_capacity:     int = None,
+        demand: np.ndarray    = None,
         starting_node:    int = 0,
         max_it:           int = 100,
         evaporation_rate: float = 0.7,
@@ -180,6 +181,9 @@ class NTargetsACO(AntColonyOptimization):
         )
         self.n_paths       = n_paths
         self.starting_node = starting_node
+        self.demand        = demand
+        if demand is None:
+            self.demand = np.ones((self.n_nodes))
 
         self.max_capacity  = max_capacity
         if max_capacity is None:
