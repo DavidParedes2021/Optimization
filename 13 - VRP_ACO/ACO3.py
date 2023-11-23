@@ -190,6 +190,7 @@ class NTargetsACO(AntColonyOptimization):
             self.max_capacity = round(self.n_nodes / n_paths)
 
         self.max_path_length += n_paths - 1
+
     # end __init__
     def solve(self):
         self.__init_var()
@@ -219,3 +220,5 @@ class NTargetsACO(AntColonyOptimization):
 
         return self.best_ant, self.best_ant_length
     # end solve
+    def __path_cost(self, path) -> int:
+        return np.sum(self.demand[path])
