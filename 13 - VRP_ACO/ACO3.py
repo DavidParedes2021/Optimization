@@ -45,9 +45,9 @@ class AntColonyOptimization:
         self.max_path_length = self.n_nodes
 
     def __init_var(self):
-        self.hstc_mtx = self.__default_h_calc(self.dist_mtx)
+        self.hstc_mtx = self.heuristic_calc_func(self.dist_mtx)
         self.pher_mxt = np.ones_like(self.dist_mtx) * 0.01
-        self.best_ant = np.zeros((self.max_path_length))
+        self.best_ant = np.zeros((self.max_path_length), dtype=np.int32)
         
     def test_print(self):
         print(self.hstc_mtx)
@@ -55,7 +55,7 @@ class AntColonyOptimization:
 
     def solve(self):
         self.__init_var()
-        ant_path = np.zeros((self.n_ants, self.max_path_length))
+        ant_path = np.zeros((self.n_ants, self.max_path_length), dtype=np.int32)
         ant_path_len = np.zeros((self.n_ants))
         for k in range(self.max_it):
             for i in range(self.n_ants):
@@ -74,7 +74,7 @@ class AntColonyOptimization:
 
             self.pher_mxt *= (1.0 - self.evapr)
 
-            if k%10 and self.verbose == True:
+            if k%10 == 0 and self.verbose == True:
                 print("it: ",k)
                 self.plot_function(self)
 
@@ -85,8 +85,7 @@ class AntColonyOptimization:
         heuristics = self.hstc_mtx[current]
 
         # Cast the values in 'visited' to integers and set corresponding pheromones to 0
-        visited_indices = np.array(visited, dtype=np.int64)
-        pheromones[visited_indices] = 0
+        pheromones[visited] = 0
 
         probabilities = pheromones ** self.alpha * heuristics ** self.betha
         probabilities /= np.sum(probabilities)
@@ -154,16 +153,30 @@ class ACOPlotter:
         plt.show()
 
 class NTargetsACO(AntColonyOptimization):
+    def __init_var(self):
+        self.hstc_mtx = self.heuristic_calc_func(self.dist_mtx)
+        self.pher_mxt = np.ones_like(self.dist_mtx) * 0.01
+        self.best_ant = np.zeros((self.max_path_length), dtype=np.int32)
+    def __path_len(self, path):
+        length = 0
+        for i in range(self.max_path_length - 1):
+            length += self.dist_mtx[int(path[i])][int(path[i + 1])]
+        return length
+    def __update_pheromones(self, path, length):
+        for i in range(self.max_path_length - 1):
+            self.pher_mxt[int(path[i])][int(path[i + 1])] += 1.0 / length
+            self.pher_mxt[int(path[i + 1])][int(path[i])] += 1.0 / length
+
     def __init__(self,
         dist_mtx: np.ndarray,
         n_ants:   int,
         n_paths:  int,
         plot_function,
-        max_capacity:     int = None,
-        demand: np.ndarray    = None,
-        starting_node:    int = 0,
-        max_it:           int = 100,
-        evaporation_rate: float = 0.7,
+        max_capacity:     int          = None,
+        demand:           np.ndarray   = None,
+        starting_node:    int          = 0,
+        max_it:           int          = 100,
+        evaporation_rate: float        = 0.7,
         alpha: float = 1, betha: float = 1,
         heuristic_calc_func=None,
         verbose=False
@@ -179,9 +192,12 @@ class NTargetsACO(AntColonyOptimization):
             heuristic_calc_func,
             verbose
         )
+        self.best_ant_cost = None
+        self.best_ant_prod = None
+
         self.n_paths       = n_paths
         self.starting_node = starting_node
-        self.demand        = demand
+        self.demand        = np.append([0], demand)
         if demand is None:
             self.demand = np.ones((self.n_nodes))
 
@@ -194,27 +210,40 @@ class NTargetsACO(AntColonyOptimization):
     # end __init__
     def solve(self):
         self.__init_var()
-        ant_path = np.zeros((self.n_ants, self.max_path_length))
-        ant_path_len = np.zeros((self.n_ants))
+        ant_path = np.zeros((self.n_ants, self.max_path_length), dtype=np.int32)
+        ant_path_len  = np.zeros((self.n_ants))
+        ant_path_cost = np.zeros((self.n_ants))
+        ant_path_prod = np.zeros((self.n_ants))
+
         for k in range(self.max_it):
             for i in range(self.n_ants):
+                ant_capacity   = self.max_capacity
                 ant_path[i][0] = self.starting_node
 
                 for j in range(1, self.max_path_length):
+                    if ant_capacity <= 0:
+                        ant_capacity = self.max_capacity
+                        ant_path[i][j] = self.starting_node
+                        continue
                     probs = self.__move_prob(ant_path[i][:j], int(ant_path[i][j - 1]))
-                    ant_path[i][j] = np.random.choice(np.arange(self.n_paths), p=probs)
+                    dest  = np.random.choice(np.arange(self.n_nodes), p=probs)
+                    ant_capacity -= self.demand[dest]
+                    ant_path[i][j] = dest
 
-                ant_path_len[i] = self.__path_len(ant_path[i])
+                ant_path_len[i]  = self.__path_len(ant_path[i])
+                ant_path_cost[i] = self.__path_cost(ant_path[i])
+                ant_path_prod[i] = ant_path_len[i] * ant_path_cost[i]
 
+                if (self.best_ant_cost == None) or ant_path_cost[i] < self.best_ant_cost:
+                    self.best_ant_cost = ant_path_cost[i]
                 if (self.best_ant_length == None) or ant_path_len[i] < self.best_ant_length:
-                    self.best_ant = ant_path[i].copy()
                     self.best_ant_length = ant_path_len[i]
 
                 self.__update_pheromones(ant_path[i], ant_path_len[i])
 
             self.pher_mxt *= (1.0 - self.evapr)
 
-            if k%10 and self.verbose == True:
+            if k%10 == 0 and self.verbose == True:
                 print("it: ",k)
                 self.plot_function(self)
 
@@ -222,3 +251,15 @@ class NTargetsACO(AntColonyOptimization):
     # end solve
     def __path_cost(self, path) -> int:
         return np.sum(self.demand[path])
+    # end __path_cost
+    def __move_prob(self, visited, current):
+        pheromones = np.copy(self.pher_mxt[current])
+        heuristics = self.hstc_mtx[current]
+
+        # Cast the values in 'visited' to integers and set corresponding pheromones to 0
+        visited_indices = visited[visited != self.starting_node]
+        pheromones[visited_indices] = 0
+
+        probabilities = pheromones ** self.alpha * heuristics ** self.betha
+        probabilities /= np.sum(probabilities)
+        return probabilities
