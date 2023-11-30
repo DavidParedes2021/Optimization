@@ -213,7 +213,7 @@ class NTargetsACO(AntColonyOptimization):
         ant_path = np.zeros((self.n_ants, self.max_path_length), dtype=np.int32)
         ant_path_len  = np.zeros((self.n_ants))
         ant_path_cost = np.zeros((self.n_ants))
-        ant_path_prod = np.zeros((self.n_ants))
+        # ant_path_prod = np.zeros((self.n_ants))
 
         for k in range(self.max_it):
             for i in range(self.n_ants):
@@ -241,18 +241,18 @@ class NTargetsACO(AntColonyOptimization):
 
                 ant_path_len[i]  = self.__path_len(ant_path[i])
                 ant_path_cost[i] = self.__path_cost(ant_path[i])
-                ant_path_prod[i] = ant_path_len[i] * ant_path_cost[i]
+                # ant_path_prod[i] = ant_path_len[i] * ant_path_cost[i]
 
                 # if (self.best_ant_cost == None) or ant_path_cost[i] < self.best_ant_cost:
                 #     self.best_ant_cost = ant_path_cost[i]
                 # if (self.best_ant_length == None) or ant_path_len[i] < self.best_ant_length:
                 #     self.best_ant_length = ant_path_len[i]
 
-                if self.best_ant_prod is None or ant_path_prod[i] <= self.best_ant_prod:
+                if self.best_ant_prod is None or ant_path_len[i] <= self.best_ant_prod:
                     self.best_ant        = ant_path[i]
                     self.best_ant_cost   = ant_path_cost[i]
                     self.best_ant_length = ant_path_len[i]
-                    self.best_ant_prod   = ant_path_prod[i]
+                    # self.best_ant_prod   = ant_path_prod[i]
 
                 self.__update_pheromones(ant_path[i], ant_path_len[i])
 
