@@ -197,7 +197,6 @@ class NTargetsACO(AntColonyOptimization):
                         except ValueError:
                             dest = self.starting_node
 
-                    ant_capacity  -= self.demand[dest]
 
                     if dest == self.starting_node:
                         n_stops     += 1
@@ -206,18 +205,19 @@ class NTargetsACO(AntColonyOptimization):
                     if cant_return:
                         overwork    += self.demand[dest]
 
+                    ant_capacity  -= self.demand[dest]
                     ant_path[i][j] = dest
 
                 ant_path_len [i] = self.__path_len(ant_path[i])
-                ant_path_cost[i] = self.__path_cost(ant_path[i])
+                ant_path_cost[i] = self.path_cost(ant_path[i])
 
                 ant_path_fit [i] = ant_path_len[i] + overwork*self.overwork_pen
 
                 if self.best_ant_fit is None or ant_path_fit[i] <= self.best_ant_fit:
-                    self.best_ant        = ant_path     [i]
-                    self.best_ant_cost   = ant_path_cost[i]
-                    self.best_ant_length = ant_path_len [i]
-                    self.best_ant_fit    = ant_path_fit [i]
+                    self.best_ant        = np.copy(ant_path     [i])
+                    self.best_ant_cost   = np.copy(ant_path_cost[i])
+                    self.best_ant_length = np.copy(ant_path_len [i])
+                    self.best_ant_fit    = np.copy(ant_path_fit [i])
 
                 self.__update_pheromones(ant_path[i], ant_path_fit[i])
 
@@ -229,9 +229,17 @@ class NTargetsACO(AntColonyOptimization):
 
         return self.best_ant, self.best_ant_length
     # end solve
-    def __path_cost(self, path) -> int:
-        return np.sum(self.demand[path])
-    # end __path_cost
+    def path_cost(self, path) -> float:
+        extra_sum  = 0.0
+        travel_sum = 0.0
+        for i in range(path.shape[0]):
+            if path[i] == self.starting_node:
+                travel_sum = 0.0
+            travel_sum += self.demand[path[i]]
+            if travel_sum >= self.max_capacity:
+                extra_sum += self.demand[path[i]]
+        return extra_sum
+    # end path_cost
     def __move_prob(self, visited, current, exclude_start):
         pheromones = np.copy(self.pher_mxt[current])
         heuristics = self.hstc_mtx[current]
