@@ -107,6 +107,10 @@ class NTargetsACO(AntColonyOptimization):
         self.hstc_mtx = self.heuristic_calc_func(self.dist_mtx)
         self.pher_mxt = np.ones_like(self.dist_mtx) * 0.01
         self.best_ant = np.zeros((self.max_path_length), dtype=np.int32)
+        
+        self.best_ant_fit    = np.inf
+        self.best_ant_cost   = np.inf
+        self.best_ant_length = np.inf
     def __path_len(self, path):
         length = 0
         for i in range(self.max_path_length - 1):
@@ -114,8 +118,8 @@ class NTargetsACO(AntColonyOptimization):
         return length
     def __update_pheromones(self, path, length):
         for i in range(self.max_path_length - 1):
-            self.pher_mxt[int(path[i])][int(path[i + 1])] += 1.0 / length
-            self.pher_mxt[int(path[i + 1])][int(path[i])] += 1.0 / length
+            self.pher_mxt[path[i]][path[i + 1]] += 1.0 / length
+            self.pher_mxt[path[i + 1]][path[i]] += self.dir_balance / length
 
     def __init__(self,
         dist_mtx: np.ndarray,
@@ -127,6 +131,8 @@ class NTargetsACO(AntColonyOptimization):
         starting_node:    int          = 0,
         max_it:           int          = 100,
         evaporation_rate: float        = 0.7,
+        overwork_penalty: float        = 500.0,
+        dir_balance:      float        = 0.8,
         alpha: float = 1, betha: float = 1,
         heuristic_calc_func=None,
         verbose=False
@@ -142,8 +148,10 @@ class NTargetsACO(AntColonyOptimization):
             heuristic_calc_func,
             verbose
         )
+        self.overwork_pen  = overwork_penalty
+        self.dir_balance   = dir_balance
         self.best_ant_cost = None
-        self.best_ant_prod = None
+        self.best_ant_fit  = None
 
         self.n_paths       = n_paths
         self.starting_node = starting_node
@@ -165,63 +173,53 @@ class NTargetsACO(AntColonyOptimization):
         ant_path = np.zeros((self.n_ants, self.max_path_length), dtype=np.int32)
         ant_path_len  = np.zeros((self.n_ants))
         ant_path_cost = np.zeros((self.n_ants))
-        # ant_path_prod = np.zeros((self.n_ants))
+        ant_path_fit  = np.zeros((self.n_ants))
 
         for k in range(self.max_it):
             for i in range(self.n_ants):
                 ant_capacity   = self.max_capacity
                 n_stops        = 1
-                is_exhausted   = False
+                overwork       = 0.0
+                cant_return    = False
                 ant_path[i][0] = self.starting_node
 
                 for j in range(1, self.max_path_length):
+                    dest = None
                     if n_stops >= self.n_paths:
-                        is_exhausted = True
+                        cant_return = True
 
-                    if ant_capacity <= 0 and not is_exhausted:
-                        ant_capacity   = self.max_capacity
-                        ant_path[i][j] = self.starting_node
-                        n_stops       += 1
-                        continue
-
-                    probs = self.__move_prob(ant_path[i][:j], int(ant_path[i][j - 1]), is_exhausted)
-                    dest  = None
-                    try:
-                        dest  = np.random.choice(np.arange(self.n_nodes), p=probs)
-                    except ValueError:
-                        # print('####################')
-                        # print(f'Number of nodes {self.n_nodes}')
-                        # print(f'Iteration       {k}')
-                        # print(f'Ant number      {i}')
-                        # print(f'Step            {j}/{self.max_path_length}')
-                        # print(f'{np.sort(ant_path[i][:j])} [{ant_path[i][j]}]')
-                        # print('####################')
-                        # print(probs)
-                        # print('####################')
-                        # raise ValueError("probabilities contain NaN")
+                    if ant_capacity <= 0 and not cant_return:
                         dest  = self.starting_node
+                    else:
+                        probs = self.__move_prob(ant_path[i][:j], ant_path[i][j - 1], cant_return)
+                        try:
+                            dest = np.random.choice(np.arange(self.n_nodes), p=probs)
+                        except ValueError:
+                            dest = self.starting_node
+
+                    ant_capacity  -= self.demand[dest]
 
                     if dest == self.starting_node:
-                        n_stops += 1
-                    ant_capacity  -= self.demand[dest]
+                        n_stops     += 1
+                        overwork    += abs(ant_capacity)
+                        ant_capacity = self.max_capacity
+                    if cant_return:
+                        overwork    += self.demand[dest]
+
                     ant_path[i][j] = dest
 
-                ant_path_len[i]  = self.__path_len(ant_path[i])
+                ant_path_len [i] = self.__path_len(ant_path[i])
                 ant_path_cost[i] = self.__path_cost(ant_path[i])
-                # ant_path_prod[i] = ant_path_len[i] * ant_path_cost[i]
 
-                # if (self.best_ant_cost == None) or ant_path_cost[i] < self.best_ant_cost:
-                #     self.best_ant_cost = ant_path_cost[i]
-                # if (self.best_ant_length == None) or ant_path_len[i] < self.best_ant_length:
-                #     self.best_ant_length = ant_path_len[i]
+                ant_path_fit [i] = ant_path_len[i] + overwork*self.overwork_pen
 
-                if self.best_ant_prod is None or ant_path_len[i] <= self.best_ant_prod:
-                    self.best_ant        = ant_path[i]
+                if self.best_ant_fit is None or ant_path_fit[i] <= self.best_ant_fit:
+                    self.best_ant        = ant_path     [i]
                     self.best_ant_cost   = ant_path_cost[i]
-                    self.best_ant_length = ant_path_len[i]
-                    # self.best_ant_prod   = ant_path_prod[i]
+                    self.best_ant_length = ant_path_len [i]
+                    self.best_ant_fit    = ant_path_fit [i]
 
-                self.__update_pheromones(ant_path[i], ant_path_len[i])
+                self.__update_pheromones(ant_path[i], ant_path_fit[i])
 
             self.pher_mxt *= (1.0 - self.evapr)
 
